@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Claude Code Harbor</title>
+<meta name="description" content="Your Claude Code sessions as a live 3D harbor: ships are sessions, containers are tool calls, tugboats are subagents.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a1122;--panel:rgba(12,18,34,.80);--panel2:rgba(255,255,255,.04);--line:rgba(255,255,255,.09);--ink:#eef2ff;--dim:#8d98bb;--amber:#ffb547;--green:#3ddc97;--blue:#4ea8ff;--coral:#ff7a59;--violet:#b388ff;--yellow:#ffd166}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:'Space Grotesk',system-ui,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.glass{background:var(--panel);border:1px solid var(--line);border-radius:18px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 20px 50px rgba(0,0,0,.35)}
+#labels{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;left:0;top:0;transform:translate(-50%,-100%);white-space:nowrap;display:flex;align-items:center;gap:8px;padding:6px 10px 6px 8px;border-radius:12px;background:rgba(10,15,30,.86);border:1px solid var(--line);font-size:14px;font-weight:600;will-change:transform}
+.lbl .chip{width:10px;height:10px;border-radius:3px}
+.lbl .st{font:600 11px 'JetBrains Mono',monospace;padding:3px 7px;border-radius:999px;background:rgba(255,255,255,.07);color:var(--dim)}
+.lbl .st.work{color:#0b1222;background:var(--green)}
+.lbl .st.need{color:#1a1203;background:var(--amber);animation:pulse 1s ease-in-out infinite}
+.lbl .st.done{color:var(--green);background:rgba(61,220,151,.12)}
+.lbl.tug{font-size:11px;padding:3px 8px;border-radius:999px;font-family:'JetBrains Mono',monospace;font-weight:600;color:#cfe3ff}
+@keyframes pulse{50%{box-shadow:0 0 0 6px rgba(255,181,71,.18)}}
+#brand{position:fixed;left:24px;top:22px;display:flex;align-items:center;gap:14px;padding:12px 18px 12px 14px}
+#brand svg{width:34px;height:34px}
+#brand b{font-size:20px;letter-spacing:-.01em;display:block}
+#brand small{display:flex;align-items:center;gap:7px;color:var(--dim);font:500 12px 'JetBrains Mono',monospace;margin-top:3px}
+.dot{width:8px;height:8px;border-radius:50%;background:#59627f}
+.dot.on{background:var(--green);box-shadow:0 0 10px var(--green)}
+.dot.wait{background:var(--amber)}
+#stats{position:fixed;left:50%;top:22px;transform:translateX(-50%);display:flex;gap:6px;padding:7px}
+.stat{display:flex;align-items:baseline;gap:7px;padding:9px 14px;border-radius:12px;background:var(--panel2)}
+.stat b{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.stat span{color:var(--dim);font-size:13px}
+.stat.need{background:rgba(255,181,71,.10)} .stat.need b{color:var(--amber)}
+.stat.need.zero{background:var(--panel2)} .stat.need.zero b{color:var(--ink)}
+#fleet{position:fixed;right:22px;top:22px;bottom:22px;width:352px;display:flex;flex-direction:column;padding:16px;overflow:hidden}
+#fleet h3{margin:2px 4px 12px;font-size:16px;display:flex;justify-content:space-between;align-items:baseline}
+#fleet h3 span{color:var(--dim);font:500 12px 'JetBrains Mono',monospace}
+#ships{display:flex;flex-direction:column;gap:9px;overflow:auto;flex:1;scrollbar-width:none}
+.card{padding:12px 13px;border-radius:14px;background:var(--panel2);border:1px solid transparent;transition:border-color .3s,background .3s}
+.card.need{border-color:rgba(255,181,71,.55);background:rgba(255,181,71,.07)}
+.card .top{display:flex;align-items:center;gap:9px}
+.card .top b{font-size:15px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .sid{color:var(--dim);font:500 11px 'JetBrains Mono',monospace}
+.card .line{margin-top:6px;color:var(--dim);font-size:12.5px;display:flex;justify-content:space-between;gap:8px}
+.card .line .mono{font-size:11.5px}
+.bar{display:flex;height:6px;border-radius:4px;overflow:hidden;margin-top:9px;background:rgba(255,255,255,.05)}
+.bar i{display:block;height:100%}
+.pill{font:600 10.5px 'JetBrains Mono',monospace;padding:3px 8px;border-radius:999px;background:rgba(255,255,255,.07);color:var(--dim);white-space:nowrap}
+.pill.work{background:rgba(61,220,151,.15);color:var(--green)}
+.pill.need{background:var(--amber);color:#1a1203}
+.pill.done{background:rgba(78,168,255,.13);color:#9ccaff}
+.pill.sea{background:rgba(179,136,255,.14);color:#cdb4ff}
+.empty{color:var(--dim);font-size:13px;line-height:1.5;padding:10px 6px}
+#log{position:fixed;left:24px;bottom:24px;width:430px;padding:14px 16px}
+#log h4{margin:0 0 8px;font-size:12px;color:var(--dim);font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+#log .r{display:flex;gap:10px;font:500 12.5px 'JetBrains Mono',monospace;line-height:1.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:fadein .4s ease}
+#log .r time{color:#5d6888}
+body.cap *{animation:none!important;transition:none!important}
+@keyframes fadein{from{opacity:0;transform:translateY(5px)}}
+#legend{position:fixed;left:470px;right:396px;bottom:24px;display:flex;justify-content:center;pointer-events:none}
+#legend div{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;padding:10px 16px;border-radius:14px}
+#legend span{display:flex;align-items:center;gap:7px;font-size:12.5px;color:#c4cbe3}
+#legend i{width:14px;height:9px;border-radius:2px;display:inline-block}
+#toast{position:fixed;left:50%;top:96px;transform:translate(-50%,-14px);opacity:0;transition:all .35s ease;padding:11px 18px;border-radius:14px;background:rgba(255,181,71,.95);color:#1a1203;font-weight:700;font-size:15px;display:flex;gap:10px;align-items:center;pointer-events:none}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+#toast small{font:600 12px 'JetBrains Mono',monospace;opacity:.75}
+#zoom{position:fixed;right:396px;bottom:24px;display:flex;flex-direction:column;gap:6px}
+#zoom button{width:38px;height:38px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-size:18px;cursor:pointer}
+#setup{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(6,10,20,.55);padding:16px;z-index:5}
+#setup .box{max-width:720px;width:100%;max-height:calc(100vh - 32px);overflow:auto;padding:28px}
+#setup h1{margin:0 0 6px;font-size:30px;letter-spacing:-.02em}
+#setup p{color:#c4cbe3;line-height:1.55;margin:8px 0}
+#setup ol{padding-left:20px;color:#c4cbe3;line-height:1.6}
+#setup pre{background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:12px;padding:12px;max-height:180px;overflow:auto;font:12px/1.5 'JetBrains Mono',monospace;color:#cfd7f2;white-space:pre-wrap}
+#setup .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+#setup button{font:600 14px 'Space Grotesk',sans-serif;padding:11px 16px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--ink);cursor:pointer}
+#setup button.primary{background:var(--green);color:#06140d;border-color:transparent}
+#setup .fine{font-size:12.5px;color:var(--dim)}
+#badge{position:fixed;left:24px;top:100px;font:600 11px 'JetBrains Mono',monospace;color:var(--dim);padding:6px 10px;border-radius:10px;display:none}
+@media (max-width:1500px) and (min-width:901px){#stats{left:24px;top:98px;transform:none}#legend{display:none}#fleet{width:300px}#zoom{right:340px}#badge{top:176px}#toast{top:176px}}
+.stat span{white-space:nowrap}
+@media (max-width:900px){
+  #fleet{top:auto;bottom:12px;right:12px;left:12px;width:auto;height:34vh;padding:12px}
+  #log,#legend,#zoom{display:none}
+  #stats{top:auto;bottom:calc(34vh + 22px);left:12px;right:12px;transform:none;overflow-x:auto;justify-content:flex-start}
+  .stat{padding:7px 10px}.stat b{font-size:17px}.stat span{font-size:11px}
+  #brand{left:12px;top:12px;padding:9px 12px}#brand b{font-size:16px}
+  #toast{top:76px;font-size:13px}
+  #badge{left:12px;top:72px}
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="labels"></div>
+
+<div id="brand" class="glass">
+  <svg viewBox="0 0 40 40" fill="none" aria-hidden="true"><rect width="40" height="40" rx="11" fill="#13203d"/><path d="M20 9v20M14 13h12M11 23c1.5 4 5 6.5 9 6.5s7.5-2.5 9-6.5" stroke="#eef2ff" stroke-width="2.4" stroke-linecap="round"/><circle cx="20" cy="9" r="2.6" fill="#ffb547"/></svg>
+  <div><b>Claude Code Harbor</b><small><i class="dot" id="cdot"></i><span id="cstat">connecting…</span></small></div>
+</div>
+<div id="badge" class="glass"></div>
+
+<div id="stats" class="glass">
+  <div class="stat"><b id="sDock">0</b><span>docked</span></div>
+  <div class="stat"><b id="sWork">0</b><span>working</span></div>
+  <div class="stat need zero" id="sNeedW"><b id="sNeed">0</b><span>need you</span></div>
+  <div class="stat"><b id="sTug">0</b><span>tugs out</span></div>
+  <div class="stat"><b id="sBox">0</b><span>tool calls</span></div>
+</div>
+
+<div id="toast"><span>⚑</span><span id="toastT"></span><small id="toastS"></small></div>
+
+<aside id="fleet" class="glass"><h3>Fleet <span id="fleetN">0 ships</span></h3><div id="ships"></div></aside>
+
+<div id="log" class="glass"><h4>Harbor log</h4><div id="logRows"></div></div>
+
+<div id="legend"><div class="glass">
+  <span><i style="background:var(--blue)"></i>read · search</span>
+  <span><i style="background:var(--coral)"></i>edit · write</span>
+  <span><i style="background:var(--green)"></i>terminal</span>
+  <span><i style="background:var(--violet)"></i>web</span>
+  <span><i style="background:var(--yellow)"></i>other · MCP</span>
+  <span>⛴ tug = subagent</span>
+  <span>🗼 lighthouse = needs you</span>
+</div></div>
+
+<div id="zoom"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button></div>
+
+<div id="setup"><div class="box glass">
+  <h1>Claude Code Harbor</h1>
+  <p>Every Claude Code session docks as a ship. Every tool call is a container the crane loads. Subagents head out as tugboats. When a session needs you, the lighthouse turns on.</p>
+  <ol>
+    <li>Paste this prompt into Claude Code. It installs one small hook script and gives you your private link.</li>
+    <li>Open the link. Restart your Claude Code sessions and watch them dock.</li>
+  </ol>
+  <pre id="prompt"></pre>
+  <div class="row"><button class="primary" id="copy">Copy setup prompt</button><button id="demoBtn">Watch a replay of a real run</button></div>
+  <p class="fine">Runs on Claude Code hooks, so it uses zero tokens. The hook sends only the event name, a short session id, the project folder name and the tool name to your private ntfy.sh channel. It never sends prompts, code, commands or file contents.</p>
+</div></div>
+
+<script type="text/plain" id="hooksrc">#!/usr/bin/env bash
+# Claude Code Harbor hook.
+# Each Claude Code event becomes ONE tiny line like:
+#   {"e":"PreToolUse","s":"1d218b4c","p":"my-app","t":"Bash","ts":1730000000}
+# It never sends prompts, code, commands, file contents or file paths: only the
+# event name, a short session id, the project FOLDER name and the tool name.
+# Runs as a shell command, so it uses zero model tokens.
+D="$HOME/.claude/harbor"
+IN=$(cat)
+f(){ printf '%s' "$IN" | grep -o "\"$1\":\"[^\"]*\"" | head -1 | sed "s/^\"$1\":\"//; s/\"\$//"; }
+E=$(f hook_event_name); [ -z "$E" ] && exit 0
+S=$(f session_id); S=${S:0:8}
+C=$(f cwd); P=${C##*/}; P=${P##*\\}
+[ -n "$HARBOR_HIDE_PROJECT" ] && P="project"
+T=$(f tool_name); A=$(f agent_id); A=${A:0:6}
+U=""; SA=""; X=""
+case "$T" in Agent|Task) U=$(f tool_use_id); U=${U: -6}; SA=$(f subagent_type);; esac
+[ "$E" = "Notification" ] && X=$(f notification_type)
+L="{\"e\":\"$E\",\"s\":\"$S\",\"p\":\"$P\",\"ts\":$(date +%s)"
+[ -n "$T" ] && L="$L,\"t\":\"$T\""
+[ -n "$A" ] && L="$L,\"a\":\"$A\""
+[ -n "$U" ] && L="$L,\"u\":\"$U\""
+[ -n "$SA" ] && L="$L,\"sa\":\"$SA\""
+[ -n "$X" ] && L="$L,\"x\":\"$X\""
+L="$L}"
+mkdir -p "$D"; printf '%s\n' "$L" >> "$D/queue"
+# Batch to stay far below ntfy.sh rate limits: send right away for the events
+# that matter, otherwise at most once every 10 seconds.
+NOW=$(date +%s); LAST=$(cat "$D/last" 2>/dev/null || echo 0)
+case "$E" in SessionStart|UserPromptSubmit|Notification|Stop|SessionEnd|SubagentStop) GO=1;; *) GO=0;; esac
+[ "$T" = "Agent" ] || [ "$T" = "Task" ] && GO=1
+[ $((NOW-LAST)) -ge 10 ] && GO=1
+[ "$GO" = 1 ] || exit 0
+echo "$NOW" > "$D/last"
+B="$D/batch.$$"; mv "$D/queue" "$B" 2>/dev/null || exit 0
+TOPIC=$(cat "$D/topic" 2>/dev/null)
+URL="${HARBOR_URL:-https://ntfy.sh/$TOPIC}"
+( curl -s -m 5 --data-binary @"$B" "$URL" >/dev/null 2>&1; rm -f "$B" ) >/dev/null 2>&1 &
+exit 0</script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
+import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
+import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
+import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+
+// A real run: hook events recorded from three real Claude Code sessions.
+const REAL=[{"e":"SessionStart","s":"803a152a","p":"landing-page","ts":1793563613},{"e":"UserPromptSubmit","s":"803a152a","p":"landing-page","ts":1793563613},{"e":"PreToolUse","s":"803a152a","p":"landing-page","ts":1793563615,"t":"Skill"},{"e":"PostToolUse","s":"803a152a","p":"landing-page","ts":1793563615,"t":"Skill"},{"e":"SessionStart","s":"74de68ed","p":"trading-bot","ts":1793563620},{"e":"UserPromptSubmit","s":"74de68ed","p":"trading-bot","ts":1793563621},{"e":"PreToolUse","s":"74de68ed","p":"trading-bot","ts":1793563626,"t":"Write"},{"e":"PostToolUse","s":"74de68ed","p":"trading-bot","ts":1793563626,"t":"Write"},{"e":"SessionStart","s":"2d04a862","p":"research-notes","ts":1793563626},{"e":"UserPromptSubmit","s":"2d04a862","p":"research-notes","ts":1793563626},{"e":"PreToolUse","s":"74de68ed","p":"trading-bot","ts":1793563627,"t":"Bash"},{"e":"PostToolUse","s":"74de68ed","p":"trading-bot","ts":1793563628,"t":"Bash"},{"e":"PreToolUse","s":"2d04a862","p":"research-notes","ts":1793563629,"t":"Agent","u":"U5RHhg","sa":"Explore"},{"e":"PostToolUse","s":"2d04a862","p":"research-notes","ts":1793563630,"t":"Agent","u":"U5RHhg","sa":"Explore"},{"e":"PreToolUse","s":"2d04a862","p":"research-notes","ts":1793563630,"t":"Agent","u":"vvQxK1","sa":"Explore"},{"e":"PostToolUse","s":"2d04a862","p":"research-notes","ts":1793563630,"t":"Agent","u":"vvQxK1","sa":"Explore"},{"e":"PreToolUse","s":"2d04a862","p":"research-notes","ts":1793563631,"t":"Glob","a":"a947e8"},{"e":"PostToolUse","s":"2d04a862","p":"research-notes","ts":1793563631,"t":"Glob","a":"a947e8"},{"e":"Stop","s":"2d04a862","p":"research-notes","ts":1793563632},{"e":"PreToolUse","s":"74de68ed","p":"trading-bot","ts":1793563632,"t":"Write"},{"e":"PostToolUse","s":"74de68ed","p":"trading-bot","ts":1793563632,"t":"Write"},{"e":"PreToolUse","s":"2d04a862","p":"research-notes","ts":1793563632,"t":"Glob","a":"a61f61"},{"e":"PostToolUse","s":"2d04a862","p":"research-notes","ts":1793563632,"t":"Glob","a":"a61f61"},{"e":"PreToolUse","s":"2d04a862","p":"research-notes","ts":1793563634,"t":"Bash","a":"a947e8"},{"e":"PreToolUse","s":"2d04a862","p":"research-notes","ts":1793563634,"t":"Bash","a":"a61f61"},{"e":"PostToolUse","s":"2d04a862","p":"research-notes","ts":1793563634,"t":"Bash","a":"a61f61"},{"e":"PostToolUse","s":"2d04a862","p":"research-notes","ts":1793563634,"t":"Bash","a":"a947e8"},{"e":"Stop","s":"74de68ed","p":"trading-bot","ts":1793563634},{"e":"SessionEnd","s":"74de68ed","p":"trading-bot","ts":1793563635},{"e":"PreToolUse","s":"2d04a862","p":"research-notes","ts":1793563636,"t":"Bash","a":"a947e8"},{"e":"PreToolUse","s":"803a152a","p":"landing-page","ts":1793563636,"t":"Write"},{"e":"PostToolUse","s":"2d04a862","p":"research-notes","ts":1793563636,"t":"Bash","a":"a947e8"},{"e":"PostToolUse","s":"803a152a","p":"landing-page","ts":1793563636,"t":"Write"},{"e":"SubagentStop","s":"2d04a862","p":"research-notes","ts":1793563642,"a":"a61f61"},{"e":"UserPromptSubmit","s":"2d04a862","p":"research-notes","ts":1793563642},{"e":"Stop","s":"2d04a862","p":"research-notes","ts":1793563643},{"e":"SubagentStop","s":"2d04a862","p":"research-notes","ts":1793563644,"a":"a947e8"},{"e":"UserPromptSubmit","s":"2d04a862","p":"research-notes","ts":1793563644},{"e":"PreToolUse","s":"803a152a","p":"landing-page","ts":1793563648,"t":"Write"},{"e":"PostToolUse","s":"803a152a","p":"landing-page","ts":1793563648,"t":"Write"},{"e":"PreToolUse","s":"2d04a862","p":"research-notes","ts":1793563651,"t":"Write"},{"e":"PostToolUse","s":"2d04a862","p":"research-notes","ts":1793563651,"t":"Write"},{"e":"PreToolUse","s":"803a152a","p":"landing-page","ts":1793563652,"t":"Agent","u":"qRQLQq","sa":"Explore"},{"e":"Stop","s":"2d04a862","p":"research-notes","ts":1793563654},{"e":"SessionEnd","s":"2d04a862","p":"research-notes","ts":1793563654},{"e":"PreToolUse","s":"803a152a","p":"landing-page","ts":1793563655,"t":"Read","a":"adcd96"},{"e":"PostToolUse","s":"803a152a","p":"landing-page","ts":1793563655,"t":"Read","a":"adcd96"},{"e":"PreToolUse","s":"803a152a","p":"landing-page","ts":1793563655,"t":"Read","a":"adcd96"},{"e":"PostToolUse","s":"803a152a","p":"landing-page","ts":1793563655,"t":"Read","a":"adcd96"},{"e":"PreToolUse","s":"803a152a","p":"landing-page","ts":1793563660,"t":"Bash","a":"adcd96"},{"e":"PostToolUse","s":"803a152a","p":"landing-page","ts":1793563661,"t":"Bash","a":"adcd96"},{"e":"SubagentStop","s":"803a152a","p":"landing-page","ts":1793563707,"a":"adcd96"},{"e":"PostToolUse","s":"803a152a","p":"landing-page","ts":1793563707,"t":"Agent","u":"qRQLQq","sa":"Explore"},{"e":"PreToolUse","s":"803a152a","p":"landing-page","ts":1793563709,"t":"Edit"},{"e":"PostToolUse","s":"803a152a","p":"landing-page","ts":1793563709,"t":"Edit"},{"e":"PreToolUse","s":"803a152a","p":"landing-page","ts":1793563710,"t":"Edit"},{"e":"PostToolUse","s":"803a152a","p":"landing-page","ts":1793563710,"t":"Edit"},{"e":"PreToolUse","s":"803a152a","p":"landing-page","ts":1793563710,"t":"Edit"},{"e":"PostToolUse","s":"803a152a","p":"landing-page","ts":1793563710,"t":"Edit"},{"e":"Stop","s":"803a152a","p":"landing-page","ts":1793563717},{"e":"SessionEnd","s":"803a152a","p":"landing-page","ts":1793563717}];
+
+const Q=new URLSearchParams(location.search), HS=new URLSearchParams(location.hash.slice(1));
+const TOPIC=(HS.get('t')||Q.get('t')||'').replace(/[^\w-]/g,'');
+const BASE=(HS.get('src')||Q.get('src')||'https://ntfy.sh').replace(/\/$/,'');
+const CAPTURE=Q.has('capture');
+let MODE=CAPTURE?'capture':(HS.has('demo')||Q.has('demo')||HS.has('replay'))?'demo':TOPIC?'live':'setup';
+const $=id=>document.getElementById(id);
+
+function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+let R=mulberry(11);
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)), lerp=(a,b,k)=>a+(b-a)*k;
+const ease=k=>k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2, seg=(p,a,b)=>clamp((p-a)/(b-a));
+
+// ---------- categories
+const CAT={research:{c:'#4ea8ff',n:'read'},code:{c:'#ff7a59',n:'edit'},terminal:{c:'#3ddc97',n:'terminal'},web:{c:'#b388ff',n:'web'},other:{c:'#ffd166',n:'other'}};
+function catOf(t=''){if(/^(Read|Grep|Glob|LS|NotebookRead)$/.test(t))return'research';if(/^(Edit|Write|MultiEdit|NotebookEdit)$/.test(t))return'code';if(/^(Bash|BashOutput|KillShell|KillBash)$/.test(t))return'terminal';if(/^(WebFetch|WebSearch)$/.test(t))return'web';return'other'}
+const FUNNEL=['#ff6b6b','#4ea8ff','#3ddc97','#ffd166','#c77dff','#ff9f43','#2ec4b6','#f15bb5'];
+
+// ---------- renderer / scene
+const canvas=$('c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(CAPTURE?1:Math.min(2,devicePixelRatio||1));
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.22;
+const scene=new THREE.Scene();
+{const cv=document.createElement('canvas');cv.width=4;cv.height=256;const g=cv.getContext('2d');const gr=g.createLinearGradient(0,0,0,256);gr.addColorStop(0,'#070c1c');gr.addColorStop(.55,'#121c3c');gr.addColorStop(1,'#2a2a55');g.fillStyle=gr;g.fillRect(0,0,4,256);const tx=new THREE.CanvasTexture(cv);tx.colorSpace=THREE.SRGBColorSpace;scene.background=tx}
+scene.fog=new THREE.Fog(0x0e1733,150,330);
+const cam=new THREE.OrthographicCamera(-1,1,1,-1,1,800);
+const view={tx:0,tz:-10,v:104,az:0.74,el:0.6};
+function placeCam(){const d=260;cam.position.set(view.tx+d*Math.sin(view.az)*Math.cos(view.el),d*Math.sin(view.el),view.tz+d*Math.cos(view.az)*Math.cos(view.el));cam.lookAt(view.tx,0,view.tz);cam.updateMatrixWorld()}
+function frust(){const a=innerWidth/innerHeight;cam.top=view.v/2;cam.bottom=-view.v/2;cam.left=-view.v/2*a;cam.right=view.v/2*a;cam.updateProjectionMatrix()}
+if(innerWidth<900){view.v=150;view.tx=-2;view.tz=-6}
+placeCam();frust();
+
+const hemi=new THREE.HemisphereLight(0x8aa0e0,0x1a2032,1.6);scene.add(hemi);
+const moon=new THREE.DirectionalLight(0xcfdcff,1.7);moon.position.set(-40,70,35);scene.add(moon);
+const warm=new THREE.DirectionalLight(0xffb27a,.55);warm.position.set(30,20,-60);scene.add(warm);
+
+const gm=new THREE.DataTexture(new Uint8Array([80,80,80,255,165,165,165,255,255,255,255,255]),3,1);gm.minFilter=gm.magFilter=THREE.NearestFilter;gm.needsUpdate=true;
+const MC={};const M=(c,o={})=>{const k=c+JSON.stringify(o);return MC[k]||(MC[k]=new THREE.MeshToonMaterial({color:c,gradientMap:gm,...o}))};
+const E=(c,i=2)=>new THREE.MeshBasicMaterial({color:new THREE.Color(c).multiplyScalar(i),toneMapped:false});
+const box=(w,h,d,m,x=0,y=0,z=0,p=scene)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);p.add(o);return o};
+const cyl=(r1,r2,h,m,x=0,y=0,z=0,p=scene,s=12)=>{const o=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,s),m);o.position.set(x,y,z);p.add(o);return o};
+
+// ---------- water
+const waterU={uT:{value:0}};
+const water=new THREE.Mesh(new THREE.PlaneGeometry(900,900),new THREE.ShaderMaterial({uniforms:waterU,
+ vertexShader:'varying vec3 vW;void main(){vec4 w=modelMatrix*vec4(position,1.);vW=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}',
+ fragmentShader:`uniform float uT;varying vec3 vW;
+ float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+ float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y);}
+ void main(){vec2 p=vW.xz;float a=n(p*.04+vec2(uT*.02,uT*.015));
+  float r1=sin(p.x*.55+p.y*.25+uT*1.1+n(p*.15)*5.),r2=sin(p.x*.3-p.y*.6-uT*.8+n(p*.11+3.)*5.);
+  float rip=smoothstep(.80,1.,r1*r2)*.45;
+  vec3 deep=vec3(.012,.032,.062),shal=vec3(.018,.060,.090);
+  vec3 c=mix(deep,shal,a*.5+.25);
+  c+=vec3(.06,.11,.15)*rip*.55;
+  c+=vec3(.55,.36,.16)*rip*smoothstep(2.,-17.,p.y)*.22;
+  float far=smoothstep(70.,220.,length(p));c=mix(c,vec3(.03,.045,.09),far);
+  gl_FragColor=vec4(c,1.);}`}));
+water.rotation.x=-Math.PI/2;scene.add(water);
+
+// ---------- land, quay, yard
+const QZ=-18, QY=1.2;
+box(170,4,60,M('#4a5060'),-5,QY-2,QZ-30);              // land
+box(170,.05,14,M('#6a7080'),-5,QY+.02,QZ-7);             // quay apron
+box(170,.35,.5,M('#ffcf5a'),-5,QY-.25,QZ+.05);           // edge strip
+for(let x=-88;x<=78;x+=6){cyl(.22,.26,.5,M('#20242e'),x,QY+.25,QZ-.6)}
+for(const z of [QZ-1.3,QZ-5.2]){box(170,.08,.18,M('#8d93a3'),-5,QY+.06,z)}
+for(let x=-88;x<=78;x+=2.4){box(.5,.25,.9,M('#14161c'),x,QY-1.1,QZ+.25)} // fenders
+// yard stacks
+{const pal=['#3f6f9e','#a5533f','#3f8c6c','#8a7a3a','#6a5590','#9b4458','#4a7d86'];
+ const g=new THREE.BoxGeometry(1.95,.88,.93);const mats=pal.map(c=>M(c));
+ for(let bx=-80;bx<70;bx+=8){if(Math.abs(bx+4)<3)continue;for(let row=0;row<4;row++){for(let col=0;col<3;col++){const hgt=1+Math.floor(R()*4);for(let l=0;l<hgt;l++){const m=new THREE.Mesh(g,mats[Math.floor(R()*mats.length)]);m.position.set(bx+col*2.05,QY+.44+l*.9,QZ-15-row*1.05);scene.add(m)}}}}}
+// warehouses + light towers
+const winMat=E('#ffcf8a',1.6);
+for(let i=0;i<7;i++){const x=-78+i*24,w=16+R()*4;box(w,5,8,M('#4a4f5e'),x,QY+2.5,QZ-27);box(w+.6,.5,8.6,M('#2d313c'),x,QY+5.2,QZ-27);for(let k=0;k<6;k++)box(1.4,.5,.05,winMat,x-w/2+2+k*(w-3)/6,QY+3.6,QZ-22.95)}
+const lampMat=E('#ffe2a8',3.2);
+for(let x=-80;x<80;x+=20){cyl(.18,.25,13,M('#3a3f4c'),x,QY+6.5,QZ-9.5);box(2.2,.5,.8,lampMat,x,QY+13,QZ-9.5)}
+// skyline
+for(let i=0;i<34;i++){const x=-110+i*7+R()*3,h=10+R()*26,w=4+R()*4;const b=box(w,h,6,M('#1b2236'),x,QY+h/2,QZ-58-R()*14);
+ for(let k=0;k<h/2.2;k++)for(let j=0;j<3;j++)if(R()<.4)box(.7,.5,.05,E(R()<.8?'#ffd9a0':'#a8c8ff',1.1+R()),x-w/2+1+j*(w-2)/2,QY+1.5+k*2.2,b.position.z+3.02)}
+// breakwater + lighthouse
+const LH=new THREE.Vector3(12,0,17);
+for(let x=-95;x<=8;x+=2.6){const r=box(2.2+R()*.8,1.2+R()*.8,2.2+R()*.8,M(R()<.5?'#7a8090':'#646a7a'),x,.35,17+R()*.9-.45);r.rotation.y=R()*1.2}
+for(let i=0;i<7;i++){const a=i/7*Math.PI*2;box(2,1.6,2,M('#5c6170'),LH.x+Math.cos(a)*2.2,.5,LH.z+Math.sin(a)*2.2).rotation.y=a}
+const lh=new THREE.Group();lh.position.copy(LH);scene.add(lh);
+cyl(2.2,2.5,1.4,M('#6b7080'),0,1,0,lh,16);
+for(let i=0;i<4;i++)cyl(1.05-i*.09,1.12-i*.09,1.9,M(i%2?'#e9ecf2':'#e04848'),0,2.6+i*1.9,0,lh,16);
+cyl(1.35,1.35,.18,M('#2a2d36'),0,10.2,0,lh,16);
+const lantern=cyl(.62,.62,1.1,E('#ffcf6b',.5),0,10.9,0,lh,16);
+const roof=new THREE.Mesh(new THREE.ConeGeometry(.9,1,16),M('#e04848'));roof.position.y=11.9;lh.add(roof);
+const beamG=new THREE.ConeGeometry(7,46,32,1,true);beamG.translate(0,-23,0);beamG.rotateZ(Math.PI/2);
+const beamMat=new THREE.MeshBasicMaterial({color:0xffd27a,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,toneMapped:false});
+const beam=new THREE.Group();beam.position.set(0,10.9,0);lh.add(beam);
+const b1=new THREE.Mesh(beamG,beamMat);b1.rotation.z=-.06;beam.add(b1);const b2=b1.clone();b2.rotation.y=Math.PI;beam.add(b2);
+const lhGlow=new THREE.PointLight(0xffc06a,0,40,1.6);lhGlow.position.set(0,11,0);lh.add(lhGlow);
+
+// ---------- containers
+const ribTex=(()=>{const cv=document.createElement('canvas');cv.width=64;cv.height=16;const g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,64,16);g.fillStyle='rgba(0,0,0,.22)';for(let x=0;x<64;x+=4)g.fillRect(x,0,1.4,16);g.fillStyle='rgba(0,0,0,.35)';g.fillRect(0,0,64,1.5);g.fillRect(0,14.5,64,1.5);const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;return t})();
+const CONT={};for(const k in CAT)CONT[k]=new THREE.MeshToonMaterial({color:CAT[k].c,gradientMap:gm,map:ribTex,emissive:new THREE.Color(CAT[k].c).multiplyScalar(.12)});
+const contG=new THREE.BoxGeometry(1.95,.86,.92);
+const mkCont=cat=>new THREE.Mesh(contG,CONT[cat]);
+
+// slots on deck: 4 bays x 4 across x 3 layers
+const SLOTS=[];{const bays=[-4.4,-2.3,-.2,1.9],ac=[-1.45,-.48,.48,1.45];const order=[];for(let l=0;l<3;l++)for(const b of [1,2,0,3])for(const a of [1,2,0,3])order.push([bays[b],l,ac[a]]);order.forEach(([x,l,z])=>SLOTS.push(new THREE.Vector3(x,1.05+.45+l*.9,z)))}
+
+// ---------- ship
+function makeShip(color){
+ const g=new THREE.Group();
+ const sh=new THREE.Shape();sh.moveTo(7,-2.3);sh.lineTo(7,2.3);sh.lineTo(-4,2.3);sh.quadraticCurveTo(-6.6,1.7,-7.4,0);sh.quadraticCurveTo(-6.6,-1.7,-4,-2.3);sh.closePath();
+ const hg=new THREE.ExtrudeGeometry(sh,{depth:1.75,bevelEnabled:false});hg.rotateX(-Math.PI/2);
+ const hull=new THREE.Mesh(hg,M('#1c2638'));hull.position.y=-.7;g.add(hull);
+ const bg=new THREE.ExtrudeGeometry(sh,{depth:.28,bevelEnabled:false});bg.rotateX(-Math.PI/2);
+ const band=new THREE.Mesh(bg,M(color));band.scale.set(1.012,1,1.03);band.position.y=-.2;g.add(band);
+ const dg=new THREE.ExtrudeGeometry(sh,{depth:.06,bevelEnabled:false});dg.rotateX(-Math.PI/2);
+ const deck=new THREE.Mesh(dg,M('#6b3b2f'));deck.scale.set(.97,1,.93);deck.position.y=1.0;g.add(deck);
+ box(2.5,2.7,4.1,M('#e8ecf3'),5.35,1.05+1.35,0,g);
+ box(2.54,.42,4.14,E('#ffd59a',1.4),5.35,1.05+2.1,0,g);
+ box(1.1,.24,5.4,M('#d5dae5'),4.55,1.05+2.82,0,g);
+ box(1.14,.2,5.0,E('#9fe7ff',1.2),4.55,1.05+2.62,0,g);
+ cyl(.48,.58,1.7,M(color),6.1,1.05+2.7+.85,0,g);
+ cyl(.5,.5,.22,M('#14161c'),6.1,1.05+2.7+1.75,0,g);
+ box(.14,3.4,.14,M('#cfd6e6'),-5.4,1.05+1.7,0,g);
+ const beacon=new THREE.Mesh(new THREE.SphereGeometry(.28,12,8),E('#ff5a4f',1.2));beacon.position.set(-5.4,1.05+3.5,0);g.add(beacon);
+ box(.25,.25,.25,E('#ff4040',2.5),5.6,1.05+2.82,2.75,g);box(.25,.25,.25,E('#40ff8a',2.5),5.6,1.05+2.82,-2.75,g);
+ const cargo=new THREE.Group();g.add(cargo);
+ g.userData={beacon,cargo};return g}
+
+function makeTug(color){
+ const g=new THREE.Group();
+ const sh=new THREE.Shape();sh.moveTo(1.4,-.75);sh.lineTo(1.4,.75);sh.lineTo(-.6,.75);sh.quadraticCurveTo(-1.5,.5,-1.75,0);sh.quadraticCurveTo(-1.5,-.5,-.6,-.75);sh.closePath();
+ const hg=new THREE.ExtrudeGeometry(sh,{depth:.75,bevelEnabled:false});hg.rotateX(-Math.PI/2);
+ const h=new THREE.Mesh(hg,M('#e9433f'));h.position.y=-.3;g.add(h);
+ box(1.2,.75,1.05,M('#f2f4f8'),.35,.82,0,g);box(1.22,.22,1.07,E('#ffd59a',1.4),.35,1.0,0,g);
+ cyl(.16,.2,.6,M(color),.75,1.45,0,g,8);
+ const lamp=new THREE.Mesh(new THREE.SphereGeometry(.2,10,8),E('#ffffff',1));lamp.position.set(-.2,1.45,0);g.add(lamp);
+ g.userData={lamp};return g}
+
+// ---------- crane (one per berth)
+function makeCrane(){
+ const g=new THREE.Group(), steel=M('#c9d1e2'), dark=M('#2d3340'), acc=M('#ff9f43');
+ for(const x of[-1.7,1.7])for(const z of[QZ-6.2,QZ-1.4]){box(.38,8.2,.38,steel,x,QY+4.1,z,g);box(.7,.4,.8,dark,x,QY+.2,z,g)}
+ for(const z of[QZ-6.2,QZ-1.4])box(3.8,.4,.42,steel,0,QY+3,z,g);
+ box(3.8,.55,5.4,steel,0,QY+8.4,QZ-3.8,g);
+ for(const x of[-.75,.75])box(.34,.5,22,steel,x,QY+9,QZ+2.2,g);
+ box(2.6,1.4,2.6,M('#e5e9f1'),0,QY+9.9,QZ-8.2,g);
+ box(.3,4.2,.3,steel,0,QY+11,QZ-4.5,g).rotation.x=.25;
+ for(let z=QZ-8;z<QZ+12;z+=3)box(.6,.12,.6,E('#ffe6b0',2.2),0,QY+8.68,z,g);
+ const trolley=box(1.9,.5,1.3,acc,0,QY+8.55,QZ-3,g);
+ const cab=box(1,.7,1,M('#e5e9f1'),.6,QY+7.95,QZ-3,g);
+ const cables=[-.6,.6].map(x=>{const c=new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,1,5),dark);c.position.x=x;g.add(c);return c});
+ const spreader=box(2.15,.2,1.05,acc,0,QY+6,QZ-3,g);
+ g.userData={trolley,cab,cables,spreader};return g}
+
+const BERTHS=[-26,-9,8,25].map((x,i)=>{const crane=makeCrane();crane.position.x=x;scene.add(crane);return{x,i,ship:null,crane,cx:x,cz:QZ-3,cy:QY+6,job:null}});
+const BZ=QZ+3.0; // ship centerline z at berth
+
+// ---------- fx pools
+const foamG=new THREE.CircleGeometry(.5,12);foamG.rotateX(-Math.PI/2);
+const foamM=new THREE.MeshBasicMaterial({color:0xbcd8f0,transparent:true,opacity:.2,depthWrite:false});
+const FOAM=[];for(let i=0;i<260;i++){const m=new THREE.Mesh(foamG,foamM);m.visible=false;scene.add(m);FOAM.push({m,life:0,max:1})}
+let foamI=0;function foam(x,z,s=1,life=1.6){const f=FOAM[foamI++%FOAM.length];f.m.position.set(x,.05,z);f.life=life;f.max=life;f.s=s;f.m.visible=true}
+const ringG=new THREE.RingGeometry(.8,1,40);ringG.rotateX(-Math.PI/2);
+const RINGS=[];for(let i=0;i<30;i++){const m=new THREE.Mesh(ringG,new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,depthWrite:false,toneMapped:false}));m.visible=false;scene.add(m);RINGS.push({m,life:0})}
+let ringI=0;function ring(x,y,z,c,s=2.4,life=.8){const r=RINGS[ringI++%RINGS.length];r.m.position.set(x,y,z);r.m.material.color.set(c).multiplyScalar(2);r.life=life;r.max=life;r.s=s;r.m.visible=true}
+
+// ---------- state
+const sessions=new Map();let simT=0;const stats={calls:0};let colorI=0;
+const LBL=$('labels');
+function label(cls){const d=document.createElement('div');d.className='lbl '+cls;LBL.appendChild(d);return d}
+const ANCH=[[46,4],[52,10],[58,-2],[64,6]];
+function arrivePath(bx){return new THREE.CatmullRomCurve3([new THREE.Vector3(150,0,30),new THREE.Vector3(80,0,12),new THREE.Vector3(bx+26,0,-1),new THREE.Vector3(bx+9,0,BZ-.6),new THREE.Vector3(bx,0,BZ)])}
+function departPath(x,z){return new THREE.CatmullRomCurve3([new THREE.Vector3(x,0,z),new THREE.Vector3(x-7,0,z+1.5),new THREE.Vector3(x-10,0,z+9),new THREE.Vector3(x-2,0,z+15),new THREE.Vector3(x+16,0,z+16),new THREE.Vector3(60,0,14),new THREE.Vector3(150,0,30)])}
+
+function freeBerth(){return BERTHS.find(b=>!b.ship)}
+function newSession(ev,instant){
+ const s={id:ev.s,p:ev.p||'project',color:FUNNEL[colorI++%FUNNEL.length],counts:{research:0,code:0,terminal:0,web:0,other:0},total:0,queue:[],loaded:0,tugs:[],agents:new Map(),turn:false,needs:false,state:'arriving',last:simT,lastTool:'',created:simT};
+ s.ship=makeShip(s.color);scene.add(s.ship);s.phase=R()*6;
+ s.lbl=label('ship');
+ const b=freeBerth();
+ if(b){b.ship=s;s.berth=b;s.path=arrivePath(b.x);s.u=0;s.dur=instant?0:(CAPTURE?5.5:7.5);if(instant)setOnPath(s,1)}
+ else{const a=ANCH[sessions.size%ANCH.length];s.berth=null;s.state='anchored';s.ship.position.set(a[0],0,a[1]);s.ship.rotation.y=.4}
+ sessions.set(s.id,s);cue('arrive');if(!instant)logRow(`⚓ <b>${esc(s.p)}</b> entering harbor`);return s}
+function setOnPath(s,k){const p=s.path.getPointAt(k),t=s.path.getTangentAt(Math.min(k,.999));s.ship.position.set(p.x,0,p.z);s.ship.rotation.y=Math.atan2(t.z,-t.x);if(k>=1){s.state='docked';s.ship.rotation.y=0}}
+
+function tugFor(s,a){if(s.agents.has(a))return s.agents.get(a);let t=s.tugs.find(t=>!t.agent&&t.state!=='back');if(!t)t=launchTug(s,'',s.lastSA||'agent',false);t.agent=a;s.agents.set(a,t);return t}
+function launchTug(s,u,sa,instant){
+ const t={u,sa:sa||'agent',agent:null,state:'out',k:0,g:makeTug(s.color),s,flash:0,fc:'#ffffff',calls:0};
+ const n=s.tugs.length;const base=s.berth?new THREE.Vector3(s.berth.x,0,BZ):s.ship.position;
+ t.home=s.state==='docked'?new THREE.Vector3(base.x+(R()*6-3),0,BZ+4.5):s.ship.position.clone().add(new THREE.Vector3(0,0,3));
+ t.spot=new THREE.Vector3(base.x-4+n*6.5+R()*2,0,-6+R()*3);t.ang=R()*6.28;t.rad=1.8+R()*.8;
+ t.path=new THREE.CatmullRomCurve3([t.home.clone(),new THREE.Vector3((t.home.x+t.spot.x)/2,0,(t.home.z+t.spot.z)/2+1),t.spot.clone().add(new THREE.Vector3(Math.cos(t.ang)*t.rad,0,Math.sin(t.ang)*t.rad))]);
+ t.g.position.copy(t.home);scene.add(t.g);t.lbl=label('tug');t.lbl.textContent=t.sa;
+ if(instant){t.state='work';t.k=1}
+ s.tugs.push(t);s.lastSA=t.sa;return t}
+function returnTug(t){if(t.state==='back')return;t.state='back';t.k=0;const p=t.g.position.clone();const h=t.s.ship.position;t.path=new THREE.CatmullRomCurve3([p,new THREE.Vector3((p.x+h.x)/2,0,(p.z+BZ+4)/2+1),new THREE.Vector3(h.x+(R()*4-2),0,BZ+3.2)])}
+
+function depart(s,why){if(s.state==='departing'||s.state==='gone')return;
+ cue('depart');const p=s.ship.position;s.path=departPath(p.x,p.z);s.u=0;s.dur=9;s.state='departing';s.needs=false;
+ s.tugs.forEach(returnTug);if(s.berth){s.berth.ship=null;s.berth.job=null;s.berth=null}
+ logRow(`↘ <b>${esc(s.p)}</b> left the harbor${why?' · '+why:''}`);
+ }
+
+const NEEDS=new Set(['permission_prompt','idle_prompt','elicitation_dialog','']);
+function apply(ev,instant=false){
+ if(!ev||!ev.e)return;
+ if(ev.e==='Hello'){logRow('✓ channel works · waiting for sessions');return}
+ if(!ev.s)return;
+ let s=sessions.get(ev.s);
+ if(s&&s.state==='gone'){sessions.delete(ev.s);s=null}
+ if(!s){if(ev.e==='SessionEnd')return;s=newSession(ev,instant)}
+ s.last=simT;if(ev.p)s.p=ev.p;
+ switch(ev.e){
+  case'UserPromptSubmit':s.turn=true;s.needs=false;break;
+  case'PreToolUse':{s.needs=false;s.turn=true;stats.calls++;
+   if(ev.t==='Agent'||ev.t==='Task'){const t=launchTug(s,ev.u,ev.sa,instant);cue('tug');if(!instant)logRow(`⛴ <b>${esc(s.p)}</b> sent a tug · ${esc(t.sa)}`)}
+   else{const c=catOf(ev.t);s.counts[c]++;s.total++;s.lastTool=ev.t;
+    if(ev.a){cue('flash',c);const t=tugFor(s,ev.a);t.flash=1;t.fc=CAT[c].c;t.calls++;if(!instant)logRow(`<span style="color:${CAT[c].c}">■</span> ${esc(s.p)} · tug ${esc(t.sa)} · ${esc(ev.t)}`)}
+    else{if(instant)placeInstant(s,c);else{s.queue.push(c);logRow(`<span style="color:${CAT[c].c}">■</span> <b>${esc(s.p)}</b> loading ${esc(ev.t)}`)}}}
+   break}
+  case'Notification':if(NEEDS.has(ev.x||'')){s.needs=true;s.needsKind=ev.x||'';if(!instant){cue('need');logRow(`⚑ <b style="color:var(--amber)">${esc(s.p)} needs you</b>`);toast(s)}}break;
+  case'Stop':s.turn=false;s.needs=false;cue('stop');if(!instant)logRow(`✓ <b>${esc(s.p)}</b> finished its turn`);break;
+  case'SubagentStop':{let t=ev.a&&s.agents.get(ev.a);if(!t)t=s.tugs.find(t=>!t.agent&&t.state!=='back')||s.tugs.find(t=>t.state!=='back');if(t){if(instant){removeTug(t)}else{returnTug(t);cue('tugback');logRow(`↩ <b>${esc(s.p)}</b> tug ${esc(t.sa)} is back`)}}break}
+  case'SessionEnd':if(instant){removeShip(s)}else s.endPending=true;break;
+ }}
+function placeInstant(s,c){if(s.loaded<SLOTS.length){const m=mkCont(c);m.position.copy(SLOTS[s.loaded++]);s.ship.userData.cargo.add(m)}}
+function removeTug(t){scene.remove(t.g);t.lbl.remove();const s=t.s;s.tugs=s.tugs.filter(x=>x!==t);if(t.agent)s.agents.delete(t.agent)}
+function removeShip(s){s.tugs.slice().forEach(removeTug);scene.remove(s.ship);s.lbl.remove();if(s.berth){s.berth.ship=null;s.berth=null}s.state='gone';sessions.delete(s.id);
+ const w=[...sessions.values()].find(x=>x.state==='anchored');const b=freeBerth();if(w&&b){b.ship=w;w.berth=b;const p=w.ship.position;w.path=new THREE.CatmullRomCurve3([p.clone(),new THREE.Vector3(b.x+20,0,2),new THREE.Vector3(b.x+8,0,BZ-.5),new THREE.Vector3(b.x,0,BZ)]);w.u=0;w.dur=7;w.state='arriving'}}
+
+// ---------- UI
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const clock=()=>{const d=CAPTURE?new Date(Date.UTC(2026,10,1,21,14,0)+simT*1000):new Date();return d.toTimeString().slice(0,8)};
+function logRow(h){const r=document.createElement('div');r.className='r';r.innerHTML=`<time>${clock()}</time><span>${h}</span>`;const L=$('logRows');L.prepend(r);while(L.children.length>7)L.lastChild.remove()}
+let toastUntil=0;function toast(s){$('toastT').textContent=`${s.p} needs you`;$('toastS').textContent=s.needsKind==='idle_prompt'?'waiting for input':s.needsKind==='elicitation_dialog'?'has a question':'permission to continue';$('toast').classList.add('show');toastUntil=simT+3.2}
+function statusOf(s){if(s.state==='arriving')return['sea','arriving'];if(s.state==='departing')return['sea','leaving'];if(s.state==='anchored')return['sea','at anchor'];if(s.needs)return['need','needs you'];if(s.turn||s.queue.length||s.tugs.some(t=>t.state!=='back'))return['work','working'];return['done','turn done']}
+let uiT=-1;
+function ui(){
+ const arr=[...sessions.values()].filter(s=>s.state!=='gone');
+ $('sDock').textContent=arr.filter(s=>s.state==='docked').length;
+ $('sWork').textContent=arr.filter(s=>statusOf(s)[0]==='work').length;
+ const nd=arr.filter(s=>s.needs).length;$('sNeed').textContent=nd;$('sNeedW').classList.toggle('zero',!nd);
+ $('sTug').textContent=arr.reduce((a,s)=>a+s.tugs.filter(t=>t.state!=='back').length,0);
+ $('sBox').textContent=stats.calls;
+ $('fleetN').textContent=arr.length+(arr.length===1?' ship':' ships');
+ const H=arr.length?arr.map(s=>{const[st,txt]=statusOf(s);const tot=Math.max(1,s.total);
+  const bar=Object.keys(CAT).map(k=>s.counts[k]?`<i style="width:${s.counts[k]/tot*100}%;background:${CAT[k].c}"></i>`:'').join('');
+  const tugs=s.tugs.filter(t=>t.state!=='back').length;
+  return `<div class="card ${st==='need'?'need':''}"><div class="top"><i class="chip" style="width:12px;height:12px;border-radius:4px;background:${s.color}"></i><b>${esc(s.p)}</b><span class="pill ${st}">${txt}</span></div>
+  <div class="line"><span>${s.total} tool call${s.total===1?'':'s'}${tugs?` · ${tugs} tug${tugs>1?'s':''} out`:''}</span><span class="mono">${s.lastTool?esc(s.lastTool):''}</span></div><div class="bar">${bar}</div></div>`}).join('')
+  :`<div class="empty">${MODE==='live'?'No ships yet. Start or restart a Claude Code session and it will sail in.':'Harbor is quiet.'}</div>`;
+ const el=$('ships');if(el._h!==H){el.innerHTML=H;el._h=H}}
+
+// ---------- step simulation
+const tmpV=new THREE.Vector3();
+function step(dt){
+ simT+=dt;waterU.uT.value=simT;
+ for(const s of [...sessions.values()]){
+  const sh=s.ship;
+  if(s.state==='arriving'||s.state==='departing'){s.u=Math.min(1,s.u+dt/s.dur);const k=s.state==='arriving'?1-Math.pow(1-s.u,2.2):Math.pow(s.u,1.6);
+   const p=s.path.getPointAt(k),t=s.path.getTangentAt(Math.min(k,.999));sh.position.set(p.x,0,p.z);sh.rotation.y=Math.atan2(t.z,-t.x);
+   if(R()<dt*14){tmpV.set(6.6,0,0).applyAxisAngle(THREE.Object3D.DEFAULT_UP,sh.rotation.y);foam(sh.position.x+tmpV.x,sh.position.z+tmpV.z,1.4,2.2)}
+   if(s.u>=1){if(s.state==='arriving'){s.state='docked';sh.rotation.y=0;logRow(`▲ <b>${esc(s.p)}</b> docked at berth ${s.berth.i+1}`);cue('dock')}else{removeShip(s);continue}}}
+  if(s.endPending&&s.state==='docked'&&!s.queue.length&&!(s.berth&&s.berth.job))depart(s);
+  if(s.endPending&&s.state==='anchored')removeShip(s);
+  sh.position.y=Math.sin(simT*.9+s.phase)*.06;sh.rotation.z=Math.sin(simT*.7+s.phase)*.012;
+  const bc=sh.userData.beacon;const pul=s.needs?(.5+.5*Math.sin(simT*9)):0;bc.material.color.set(s.needs?'#ffb547':'#ff5a4f').multiplyScalar(s.needs?1+pul*4:1.1);bc.scale.setScalar(s.needs?1+pul*.6:1);
+  // tugs
+  for(const t of s.tugs.slice()){
+   if(t.state==='out'){t.k=Math.min(1,t.k+dt/2.6);const k=ease(t.k);const p=t.path.getPointAt(k),tg=t.path.getTangentAt(Math.min(k,.999));t.g.position.set(p.x,0,p.z);t.g.rotation.y=Math.atan2(tg.z,-tg.x);if(R()<dt*12)foam(p.x+tg.x*1.6,p.z+tg.z*1.6,.6,1.2);if(t.k>=1)t.state='work'}
+   else if(t.state==='work'){t.ang+=dt*.45;const x=t.spot.x+Math.cos(t.ang)*t.rad,z=t.spot.z+Math.sin(t.ang)*t.rad;t.g.position.set(x,0,z);t.g.rotation.y=Math.atan2(Math.cos(t.ang),Math.sin(t.ang))+Math.PI;if(R()<dt*6)foam(x,z,.5,1.1)}
+   else{t.k=Math.min(1,t.k+dt/2.4);const k=ease(t.k);const p=t.path.getPointAt(k),tg=t.path.getTangentAt(Math.min(k,.999));t.g.position.set(p.x,0,p.z);t.g.rotation.y=Math.atan2(tg.z,-tg.x);if(R()<dt*12)foam(p.x+tg.x*1.6,p.z+tg.z*1.6,.6,1.2);if(t.k>=1){ring(p.x,.1,p.z,s.color,2.2);removeTug(t)}}
+   t.g.position.y=Math.sin(simT*2+t.ang)*.05;
+   t.flash=Math.max(0,t.flash-dt*1.8);t.g.userData.lamp.material.color.set(t.flash>0?t.fc:'#ffffff').multiplyScalar(1+t.flash*5);t.g.userData.lamp.scale.setScalar(1+t.flash*1.4);
+   if(t.flash>.97)ring(t.g.position.x,.1,t.g.position.z,t.fc,1.6,.6);
+  }
+ }
+ // cranes
+ for(const b of BERTHS){const s=b.ship,c=b.crane.userData;
+  if(s&&s.state==='docked'&&!b.job&&s.queue.length){const cat=s.queue.shift();const slot=s.loaded<SLOTS.length?SLOTS[s.loaded++]:SLOTS[(s.loaded++)%16].clone().setY(1.05+.45+2.7);
+   const m=mkCont(cat);scene.add(m);const px=s.ship.position.x+slot.x;m.position.set(px,QY+.43,QZ-3.4);m.scale.set(1,.01,1);
+   cue('pick',cat);b.job={k:0,cat,m,slot,px,sx:b.cx,sz:b.cz,dur:s.queue.length>3?.75:s.queue.length>1?1.0:1.35}}
+  if(b.job){const j=b.job;j.k=Math.min(1,j.k+dt/j.dur);const p=j.k;
+   const sx=lerp(j.sx,j.px,ease(seg(p,0,.22)));b.cx=sx;
+   const top=QY+6.4,pickY=QY+.43+.55,shipY=s?s.ship.position.y:0;const dropY=shipY+j.slot.y+.55;
+   let z=QZ-3.4,y=top;
+   if(p<.22){z=lerp(j.sz,QZ-3.4,ease(seg(p,0,.22)));y=top}
+   else if(p<.36){y=lerp(top,pickY,ease(seg(p,.22,.36)))}
+   else if(p<.52){y=lerp(pickY,top,ease(seg(p,.36,.52)))}
+   else if(p<.7){y=top;z=lerp(QZ-3.4,BZ+j.slot.z,ease(seg(p,.52,.7)))}
+   else if(p<.86){z=BZ+j.slot.z;y=lerp(top,dropY,ease(seg(p,.7,.86)))}
+   else{z=BZ+j.slot.z;y=lerp(dropY,dropY+1.6,ease(seg(p,.86,1)))}
+   b.cz=z;b.cy=y;
+   j.m.scale.y=Math.min(1,p/.12);
+   if(p>=.36&&p<.86){j.m.position.set(sx,y-.55,z)}
+   if(p>=.86&&!j.placed){j.placed=1;if(s&&s.state==='docked'){j.m.position.copy(j.slot);cue('land',j.cat);s.ship.userData.cargo.add(j.m);ring(j.px,dropY-.5,BZ+j.slot.z,CAT[j.cat].c,2.6)}else scene.remove(j.m)}
+   if(p>=1)b.job=null}
+  else{const idle=s&&s.state==='docked'?s.ship.position.x+2:b.x;b.cx=lerp(b.cx,idle,1-Math.exp(-dt*1.5));b.cz=lerp(b.cz,QZ-3,1-Math.exp(-dt*2));b.cy=lerp(b.cy,QY+6.4,1-Math.exp(-dt*2))}
+  b.crane.position.x=b.cx;c.trolley.position.z=b.cz;c.cab.position.z=b.cz;c.spreader.position.set(0,b.cy,b.cz);
+  const top=QY+8.4;c.cables.forEach(cb=>{const L=Math.max(.1,top-b.cy);cb.scale.y=L;cb.position.set(cb.position.x,b.cy+L/2,b.cz)})}
+ // fx
+ for(const f of FOAM)if(f.m.visible){f.life-=dt;if(f.life<=0){f.m.visible=false;continue}const k=1-f.life/f.max;f.m.scale.setScalar(f.s*(.2+k*.8));f.m.position.y=.04}
+ foamM.opacity=.2;
+ for(const r of RINGS)if(r.m.visible){r.life-=dt;if(r.life<=0){r.m.visible=false;continue}const k=1-r.life/r.max;r.m.scale.setScalar(.3+k*r.s);r.m.material.opacity=(1-k)*.9}
+ // lighthouse
+ const anyNeed=[...sessions.values()].some(s=>s.needs);
+ lhState=lerp(lhState,anyNeed?1:0,1-Math.exp(-dt*4));
+ beam.rotation.y+=dt*(.6+lhState*1.4);beamMat.opacity=lhState*.22;lhGlow.intensity=lhState*60;
+ lantern.material.color.set('#ffcf6b').multiplyScalar(.5+lhState*5);
+ if(simT>toastUntil)$('toast').classList.remove('show');
+ if(!CAPTURE){for(const s of sessions.values())if(s.state==='docked'&&!s.turn&&!s.needs&&!s.queue.length&&MODE==='live'&&(performance.now()/1000-s.realLast)>1800)depart(s,'no signal for 30 min')}
+}
+let lhState=0;
+const CUES=[];window.CUES=CUES;const cue=(n,x)=>{if(CAPTURE)CUES.push([+simT.toFixed(3),n,x||''])};
+
+// ---------- labels
+const pv=new THREE.Vector3();
+function project(v){pv.copy(v).project(cam);return[(pv.x+1)/2*innerWidth,(1-pv.y)/2*innerHeight]}
+function labels(){
+ for(const s of sessions.values()){const[st,txt]=statusOf(s);const h=`<i class="chip" style="background:${s.color}"></i>${esc(s.p)}<span class="st ${st}">${txt}</span>`;if(s.lbl._h!==h){s.lbl.innerHTML=h;s.lbl._h=h}
+  tmpV.set(4.5,6.2,0).applyAxisAngle(THREE.Object3D.DEFAULT_UP,s.ship.rotation.y).add(s.ship.position);const[x,y]=project(tmpV);s.lbl.style.transform=`translate(${x}px,${y}px) translate(-50%,-100%)`;
+  for(const t of s.tugs){tmpV.copy(t.g.position).setY(2.6);const[a,b]=project(tmpV);t.lbl.style.transform=`translate(${a}px,${b}px) translate(-50%,-100%)`;t.lbl.style.opacity=t.state==='back'?.5:1}}}
+
+// ---------- post
+const composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,cam));
+const bloom=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),.75,.55,.82);composer.addPass(bloom);composer.addPass(new OutputPass());
+function resize(){renderer.setSize(innerWidth,innerHeight,false);composer.setSize(innerWidth,innerHeight);frust()}
+addEventListener('resize',resize);resize();
+
+let controls=null;
+if(!CAPTURE){controls=new OrbitControls(cam,canvas);controls.target.set(view.tx,0,view.tz);controls.enableDamping=true;controls.minPolarAngle=.55;controls.maxPolarAngle=1.15;controls.minZoom=.55;controls.maxZoom=3;controls.screenSpacePanning=false;controls.update();
+ $('zin').onclick=()=>{cam.zoom=Math.min(3,cam.zoom*1.25);cam.updateProjectionMatrix()};$('zout').onclick=()=>{cam.zoom=Math.max(.55,cam.zoom/1.25);cam.updateProjectionMatrix()}}
+
+// ---------- event sources
+const sched=[];// {at,ev}
+function schedule(ev,at){sched.push({at,ev});sched.sort((a,b)=>a.at-b.at)}
+function drain(){while(sched.length&&sched[0].at<=simT){const x=sched.shift();apply(x.ev,false)}}
+
+function setConn(cls,txt){$('cdot').className='dot '+cls;$('cstat').textContent=txt}
+function live(){
+ setConn('wait','connecting to your channel…');
+ const es=new EventSource(`${BASE}/${encodeURIComponent(TOPIC)}/sse?since=2h`);
+ let lastAt=0;
+ es.onopen=()=>setConn('on','live · '+TOPIC.slice(0,13)+'…');
+ es.onerror=()=>setConn('wait','reconnecting…');
+ es.onmessage=e=>{let d;try{d=JSON.parse(e.data)}catch{return}if(d.event!=='message'||!d.message)return;
+  const lines=d.message.split('\n').map(l=>{try{return JSON.parse(l)}catch{return null}}).filter(Boolean);
+  const nowS=Date.now()/1000;let base=Math.max(simT,lastAt),prevTs=lines.length?lines[0].ts:0;
+  lines.forEach(ev=>{const age=nowS-(ev.ts||nowS);
+   if(age>45)apply(ev,true);else{base+=Math.max(.12,Math.min(3,(ev.ts||0)-prevTs));prevTs=ev.ts||prevTs;schedule(ev,base)}
+   const s2=sessions.get(ev.s);if(s2)s2.realLast=performance.now()/1000});
+  lastAt=Math.min(base,simT+15);
+  if(lastAt>simT+20)lastAt=simT+20}}
+
+// replay of the real run (demo + capture). One "needs you" is added after the subagent
+// review, because the recorded sessions ran headless where permission prompts don't occur.
+function replayPlan(t0=1.5,loopId=''){
+ const out=[];let vt=t0,prev=REAL[0].ts;const id=s=>s+loopId;
+ for(const ev of REAL){const gap=ev.ts-prev;prev=ev.ts;vt+=gap>0?Math.min(gap,5)*.45:.16;
+  const e={...ev,s:id(ev.s)};
+  if(ev.e==='PreToolUse'&&ev.t==='Edit'&&!out.some(o=>o.ev.e==='Notification')){out.push({at:vt,ev:{e:'Notification',s:e.s,p:e.p,x:'permission_prompt',ts:ev.ts}});vt+=3.2}
+  out.push({at:vt,ev:e})}
+ return out}
+function demo(){setConn('on','replay · a real run');$('badge').style.display='block';$('badge').textContent='REPLAY OF A REAL RUN · connect yours from the setup link';
+ let loop=0;const run=()=>{const plan=replayPlan(simT+1.5,'_'+loop++);plan.forEach(p=>schedule(p.ev,p.at));const end=plan[plan.length-1].at;setTimeout(run,(end-simT+8)*1000)};run()}
+
+// ---------- setup screen
+function setupScreen(){
+ const page=location.origin+location.pathname;const hook=$('hooksrc').textContent.trim();
+ const P=`Set up Claude Code Harbor for me (a live 3D harbor page that shows my Claude Code sessions as ships). Do exactly this:
+
+1. Create the folder ~/.claude/harbor and save the script at the bottom as ~/.claude/harbor/hook.sh, then make it executable.
+2. If ~/.claude/harbor/topic does not exist yet, create it containing "harbor-" followed by 16 random lowercase hex characters (this is my private channel name). Keep it if it already exists.
+3. Add hooks to ~/.claude/settings.json for these events: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Notification, Stop, SubagentStop, SessionEnd. Each runs the command "bash ~/.claude/harbor/hook.sh" (type "command"); PreToolUse and PostToolUse use matcher "*". Merge with any hooks I already have and do not change anything else in the file.
+4. Test the channel: printf '{"e":"Hello","ts":%s}' "$(date +%s)" | curl -s --data-binary @- "https://ntfy.sh/$(cat ~/.claude/harbor/topic)"
+5. Reply with my link: ${page}#t=<my channel name>
+   and tell me to restart my Claude Code sessions so the hooks load.
+
+hook.sh:
+\`\`\`bash
+${hook}
+\`\`\``;
+ $('prompt').textContent=P;$('setup').style.display='flex';setConn('','not connected');
+ $('copy').onclick=async()=>{try{await navigator.clipboard.writeText(P);$('copy').textContent='Copied ✓'}catch{const r=document.createRange();r.selectNodeContents($('prompt'));getSelection().removeAllRanges();getSelection().addRange(r);$('copy').textContent='Press ⌘C / Ctrl+C'}};
+ $('demoBtn').onclick=()=>{$('setup').style.display='none';MODE='demo';demo()}}
+
+// ---------- capture choreography
+const KEYS=[[0,16,-10,92,.80],[5,4,-14,78,.77],[10,-8,-15,60,.73],[16,-2,-11,62,.72],[21,-18,-12,56,.70],[27,-20,-12,56,.70],[29.5,-10,-2,78,.70],[33,-22,-13,50,.70],[37,-12,-11,70,.75],[44,-2,-8,92,.79]];
+function camAt(t){let i=0;while(i<KEYS.length-2&&t>KEYS[i+1][0])i++;const a=KEYS[i],b=KEYS[i+1];const k=ease(clamp((t-a[0])/(b[0]-a[0])));view.tx=lerp(a[1],b[1],k);view.tz=lerp(a[2],b[2],k);view.v=lerp(a[3],b[3],k);view.az=lerp(a[4],b[4],k);placeCam();frust()}
+
+// ---------- loop
+function frame(dt){drain();step(dt);labels();if(simT>uiT+.2||CAPTURE){ui();uiT=simT}composer.render()}
+if(CAPTURE){
+ document.body.classList.add('cap');
+ replayPlan(.4).forEach(p=>schedule(p.ev,p.at));setConn('on','live · harbor-7f3c…');
+ window.capturePlanEnd=sched[sched.length-1].at;
+ window.render=t=>{while(simT<t-1e-6){const d=Math.min(1/30,t-simT);drain();step(d)}camAt(t);labels();ui();composer.render()};
+ document.fonts.ready.then(()=>{window.render(0);window.ready=true})}
+else{
+ if(MODE==='live')live();else if(MODE==='demo')demo();else setupScreen();
+ let lt=performance.now();
+ renderer.setAnimationLoop(()=>{const n=performance.now();const dt=Math.min(.25,(n-lt)/1000);lt=n;controls&&controls.update();frame(dt)})}
+</script>
+</body>
+</html>
